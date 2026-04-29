@@ -1,0 +1,18 @@
+[Unit]
+Description=ChitChat Application
+After=network.target
+
+[Service]
+Type=simple
+User=vedant
+WorkingDirectory=/home/vedant/Desktop/ChitChat
+EnvironmentFile=/home/vedant/Desktop/ChitChat/backend/.env
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=chitchat
+
+[Install]
+WantedBy=multi-user.target
