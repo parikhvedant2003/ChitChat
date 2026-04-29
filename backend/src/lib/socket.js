@@ -27,10 +27,21 @@ io.on("connection", (socket) => {
   // io.emit() is used to send events to all the connected clients
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
+  const guestName = socket.handshake.query.guestName;
+  if (guestName) {
+    socket.join("guest-room");
+    const count = io.sockets.adapter.rooms.get("guest-room")?.size ?? 0;
+    io.to("guest-room").emit("guestRoomUsers", count);
+  }
+
   socket.on("disconnect", () => {
     console.log("A user disconnected", socket.id);
     delete userSocketMap[userId];
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    if (guestName) {
+      const count = io.sockets.adapter.rooms.get("guest-room")?.size ?? 0;
+      io.to("guest-room").emit("guestRoomUsers", count);
+    }
   });
 });
 

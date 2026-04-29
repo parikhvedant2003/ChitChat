@@ -5,6 +5,7 @@ import SignUp from "./pages/SignUp";
 import LogIn from "./pages/LogIn";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
+import Guest from "./pages/Guest";
 
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
@@ -51,6 +52,7 @@ const App = () => {
           path="/profile"
           element={authUser ? <Profile /> : <Navigate to="/login" />}
         />
+        <Route path="/guest" element={<Guest />} />
       </Routes>
 
       <Toaster />
