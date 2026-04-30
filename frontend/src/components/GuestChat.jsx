@@ -3,8 +3,14 @@ import { useGuestStore } from "../store/useGuestStore";
 import { formatMessageTime } from "../lib/utils";
 import FileMessage from "./FileMessage";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
-import { Paperclip, Send, LogOut } from "lucide-react";
-import toast from "react-hot-toast";
+import { Paperclip, Send, LogOut, X } from "lucide-react";
+
+const formatBytes = (bytes) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
 
 const GuestChat = () => {
   const {
@@ -14,11 +20,13 @@ const GuestChat = () => {
     guestRoomUserCount,
     sendTextMessage,
     sendFile,
+    cancelUpload,
     clearGuest,
     fetchMessages,
   } = useGuestStore();
 
   const [text, setText] = useState("");
+  const [uploadState, setUploadState] = useState(null); // { name, size, progress }
   const fileInputRef = useRef(null);
   const messageEndRef = useRef(null);
 
@@ -42,7 +50,17 @@ const GuestChat = () => {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    await sendFile(file);
+    setUploadState({ name: file.name, size: file.size, progress: 0 });
+    await sendFile(file, (pct) =>
+      setUploadState((prev) => prev && { ...prev, progress: pct })
+    );
+    setUploadState(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleCancel = () => {
+    cancelUpload();
+    setUploadState(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -59,7 +77,9 @@ const GuestChat = () => {
       <div className="p-4 border-b border-base-300 flex items-center justify-between">
         <div>
           <h2 className="font-semibold text-lg">Guest Room</h2>
-          <p className="text-sm text-zinc-400">{guestRoomUserCount} guest{guestRoomUserCount !== 1 ? "s" : ""} online</p>
+          <p className="text-sm text-zinc-400">
+            {guestRoomUserCount} guest{guestRoomUserCount !== 1 ? "s" : ""} online
+          </p>
         </div>
         <button
           onClick={clearGuest}
@@ -98,6 +118,34 @@ const GuestChat = () => {
         ))}
       </div>
 
+      {uploadState && (
+        <div className="px-4 pb-3 pt-1 border-t border-base-300">
+          <div className="flex items-center justify-between text-sm mb-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <Paperclip className="size-4 shrink-0 text-zinc-400" />
+              <span className="truncate text-zinc-300">{uploadState.name}</span>
+              <span className="text-zinc-500 shrink-0">{formatBytes(uploadState.size)}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <span className="text-primary font-medium">{uploadState.progress}%</span>
+              <button
+                onClick={handleCancel}
+                className="btn btn-xs btn-ghost btn-circle text-error"
+                title="Cancel upload"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+          <div className="w-full bg-base-300 rounded-full h-2">
+            <div
+              className="bg-primary h-2 rounded-full transition-all duration-200"
+              style={{ width: `${uploadState.progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="p-4 w-full">
         <form onSubmit={handleSendText} className="flex items-center gap-2">
           <div className="flex-1 flex gap-2">
@@ -118,6 +166,8 @@ const GuestChat = () => {
               type="button"
               className="hidden sm:flex btn btn-circle text-zinc-400"
               onClick={() => fileInputRef.current?.click()}
+              disabled={!!uploadState}
+              title={uploadState ? "Upload in progress" : "Attach file"}
             >
               <Paperclip size={20} />
             </button>

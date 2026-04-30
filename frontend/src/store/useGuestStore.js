@@ -12,12 +12,11 @@ export const useGuestStore = create((set, get) => ({
   isLoading: false,
   socket: null,
   guestRoomUserCount: 0,
+  uploadController: null,
 
   loadGuestName: () => {
     const name = localStorage.getItem("guestName");
-    if (name) {
-      get().setGuestName(name);
-    }
+    if (name) get().setGuestName(name);
   },
 
   setGuestName: (name) => {
@@ -50,43 +49,50 @@ export const useGuestStore = create((set, get) => ({
     }
   },
 
-  sendFile: async (file) => {
+  sendFile: async (file, onProgress) => {
     const { guestName } = get();
+    const controller = new AbortController();
+    set({ uploadController: controller });
     try {
-      const fileData = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      await axiosInstance.post("/guest/upload", {
-        guestName,
-        fileName: file.name,
-        fileType: file.type,
-        fileData,
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("guestName", guestName);
+      await axiosInstance.post("/guest/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        signal: controller.signal,
+        onUploadProgress: (e) => {
+          if (onProgress && e.total) onProgress(Math.round((e.loaded * 100) / e.total));
+        },
       });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to upload file");
+      if (error.code === "ERR_CANCELED") {
+        toast("Upload cancelled");
+      } else {
+        toast.error(error.response?.data?.message || "Failed to upload file");
+      }
+    } finally {
+      set({ uploadController: null });
+    }
+  },
+
+  cancelUpload: () => {
+    const { uploadController } = get();
+    if (uploadController) {
+      uploadController.abort();
+      set({ uploadController: null });
     }
   },
 
   connectSocket: () => {
     const { guestName, socket } = get();
-    if (!guestName) return;
-    if (socket) return;
-
-    const newSocket = io(BASE_URL, {
-      query: { guestName },
-    });
-
+    if (!guestName || socket) return;
+    const newSocket = io(BASE_URL, { query: { guestName } });
     newSocket.on("newGuestMessage", (message) => {
       set({ messages: [...get().messages, message] });
     });
-
     newSocket.on("guestRoomUsers", (count) => {
       set({ guestRoomUserCount: count });
     });
-
     set({ socket: newSocket });
   },
 
@@ -97,6 +103,7 @@ export const useGuestStore = create((set, get) => ({
   },
 
   clearGuest: () => {
+    get().cancelUpload();
     get().disconnectSocket();
     localStorage.removeItem("guestName");
     set({ guestName: null, messages: [], guestRoomUserCount: 0 });

@@ -1,12 +1,5 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import GuestMessage from "../models/guestMessage.models.js";
 import { io } from "../lib/socket.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, "../../uploads");
 
 export const getMessages = async (req, res) => {
   try {
@@ -44,26 +37,19 @@ export const sendMessage = async (req, res) => {
 
 export const uploadFile = async (req, res) => {
   try {
-    const { guestName, fileName, fileType, fileData } = req.body;
+    const { guestName } = req.body;
     if (!guestName?.trim()) {
       return res.status(400).json({ message: "Guest name is required" });
     }
-    if (!fileData || !fileName) {
-      return res.status(400).json({ message: "File data is required" });
+    if (!req.file) {
+      return res.status(400).json({ message: "File is required" });
     }
-
-    const base64Data = fileData.includes(",") ? fileData.split(",")[1] : fileData;
-    const buffer = Buffer.from(base64Data, "base64");
-
-    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const uniqueFilename = `${Date.now()}-${safeFileName}`;
-    await fs.promises.writeFile(path.join(uploadsDir, uniqueFilename), buffer);
 
     const newMessage = new GuestMessage({
       senderName: guestName.trim().slice(0, 50),
-      fileUrl: `/uploads/${uniqueFilename}`,
-      fileName,
-      fileType,
+      fileUrl: `/uploads/${req.file.filename}`,
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype,
     });
     await newMessage.save();
     io.to("guest-room").emit("newGuestMessage", newMessage);

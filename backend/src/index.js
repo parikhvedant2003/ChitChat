@@ -17,8 +17,8 @@ const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json({ limit: Infinity }));
-app.use(express.urlencoded({ limit: Infinity, extended: true }));
+app.use(express.json({ limit: "100gb" }));
+app.use(express.urlencoded({ limit: "100gb", extended: true }));
 app.use(cookieParser()); // Middleware to parse cookies
 app.use(
   cors({
@@ -34,6 +34,12 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/auth", authRoutes);
 app.use("/api/message", messageRoutes);
 app.use("/api/guest", guestRoutes);
+
+const frontendDist = path.join(__dirname, "../../frontend/dist");
+app.use(express.static(frontendDist));
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(frontendDist, "index.html"));
+});
 
 server.listen(PORT, () => {
   console.log("Server is running on port", PORT);
